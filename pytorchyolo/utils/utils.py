@@ -12,7 +12,9 @@ import random
 import imgaug as ia
 import psutil
 import pynvml
+import timeit
 
+start_time = timeit.default_timer()
 
 def provide_determinism(seed=42):
     random.seed(seed)
@@ -68,20 +70,24 @@ def rescale_boxes(boxes, current_dim, original_shape):
     Rescales bounding boxes to the original shape
     """
     orig_h, orig_w = original_shape
-
+    log_metrics()
     # The amount of padding that was added
     pad_x = max(orig_h - orig_w, 0) * (current_dim / max(original_shape))
     pad_y = max(orig_w - orig_h, 0) * (current_dim / max(original_shape))
-
+    log_metrics()
     # Image height and width after padding is removed
     unpad_h = current_dim - pad_y
     unpad_w = current_dim - pad_x
-
+    log_metrics()
     # Rescale bounding boxes to dimension of original image
     boxes[:, 0] = ((boxes[:, 0] - pad_x // 2) / unpad_w) * orig_w
+    log_metrics()
     boxes[:, 1] = ((boxes[:, 1] - pad_y // 2) / unpad_h) * orig_h
+    log_metrics()
     boxes[:, 2] = ((boxes[:, 2] - pad_x // 2) / unpad_w) * orig_w
+    log_metrics()
     boxes[:, 3] = ((boxes[:, 3] - pad_y // 2) / unpad_h) * orig_h
+    log_metrics()
     return boxes
 
 
@@ -172,17 +178,18 @@ def compute_ap(recall, precision):
     # first append sentinel values at the end
     mrec = np.concatenate(([0.0], recall, [1.0]))
     mpre = np.concatenate(([0.0], precision, [0.0]))
-
+    log_metrics()
     # compute the precision envelope
     for i in range(mpre.size - 1, 0, -1):
         mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
-
+    log_metrics()
     # to calculate area under PR curve, look for points
     # where X axis (recall) changes value
     i = np.where(mrec[1:] != mrec[:-1])[0]
-
+    log_metrics()
     # and sum (\Delta recall) * prec
     ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+    log_metrics()
     return ap
 
 
@@ -247,34 +254,41 @@ def bbox_iou(box1, box2, x1y1x2y2=True):
     """
     Returns the IoU of two bounding boxes
     """
+    log_metrics()
     if not x1y1x2y2:
         # Transform from center and width to exact coordinates
         b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / 2, box1[:, 0] + box1[:, 2] / 2
         b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / 2, box1[:, 1] + box1[:, 3] / 2
+        log_metrics()
         b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / 2, box2[:, 0] + box2[:, 2] / 2
         b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / 2, box2[:, 1] + box2[:, 3] / 2
+        log_metrics()
     else:
         # Get the coordinates of bounding boxes
         b1_x1, b1_y1, b1_x2, b1_y2 = \
             box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
+        log_metrics()
         b2_x1, b2_y1, b2_x2, b2_y2 = \
             box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
+        log_metrics()
 
     # get the corrdinates of the intersection rectangle
     inter_rect_x1 = torch.max(b1_x1, b2_x1)
     inter_rect_y1 = torch.max(b1_y1, b2_y1)
     inter_rect_x2 = torch.min(b1_x2, b2_x2)
     inter_rect_y2 = torch.min(b1_y2, b2_y2)
+    log_metrics()
     # Intersection area
     inter_area = torch.clamp(inter_rect_x2 - inter_rect_x1 + 1, min=0) * torch.clamp(
         inter_rect_y2 - inter_rect_y1 + 1, min=0
     )
+    log_metrics()
     # Union Area
     b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
     b2_area = (b2_x2 - b2_x1 + 1) * (b2_y2 - b2_y1 + 1)
-
+    log_metrics()
     iou = inter_area / (b1_area + b2_area - inter_area + 1e-16)
-
+    log_metrics()
     return iou
 
 
@@ -294,19 +308,25 @@ def box_iou(box1, box2):
     def box_area(box):
         # box = 4xn
         return (box[2] - box[0]) * (box[3] - box[1])
-
+    log_metrics()
     area1 = box_area(box1.T)
+    log_metrics()
     area2 = box_area(box2.T)
-
+    log_metrics()
     # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
     inter = (torch.min(box1[:, None, 2:], box2[:, 2:]) -
              torch.max(box1[:, None, :2], box2[:, :2])).clamp(0).prod(2)
+    log_metrics()
     # iou = inter / (area1 + area2 - inter)
     return inter / (area1[:, None] + area2 - inter)
 
 
 import csv
-def log_metrics():
+def log_metrics(first_time:bool=False):
+
+    write_mode = "a"
+    if first_time:
+        write_mode = "w"
 
     # CPU utilization
     cpu_utilization = psutil.cpu_percent(interval=None)
@@ -315,6 +335,8 @@ def log_metrics():
     # Memory utilization
     memory_utilization = psutil.virtual_memory().percent
 
+    cur_time = timeit.default_timer() - start_time
+    cur_time = round(cur_time, 6)
     if torch.cuda.is_available():
         # GPU utilization
         gpu_utilization = torch.cuda.device(0).utilization
@@ -328,17 +350,19 @@ def log_metrics():
         draw = pynvml.nvmlDeviceGetPowerUsage(handle)
 
 
-        with open("./results/results.csv", "a") as res_csv:
-            fieldnames = ['cpu_util', 'mem_util', 'gpu_util', 'gpu_mem', 'gpu_draw']
-            res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames)
-            res_writer.writeheader()
-            res_writer.writerow({'cpu_util': cpu_utilization, 'mem_util': memory_utilization, 'gpu_util': gpu_utilization, 'gpu_mem':gpu_memory_utilization, 'gpu_draw': draw})
+        with open("./results/results.csv", write_mode) as res_csv:
+            fieldnames = ['time', 'cpu_util', 'mem_util', 'gpu_util', 'gpu_mem', 'gpu_draw']
+            res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames, lineterminator = '\n')
+            if first_time:
+                res_writer.writeheader()
+            res_writer.writerow({'time': cur_time, 'cpu_util': cpu_utilization, 'mem_util': memory_utilization, 'gpu_util': gpu_utilization, 'gpu_mem':gpu_memory_utilization, 'gpu_draw': draw})
     else:
-        with open("./results/results.csv", "a") as res_csv:
-            fieldnames = ['cpu_util', 'mem_util', 'load_avg']
-            res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames)
-            res_writer.writeheader()
-            res_writer.writerow({'cpu_util': cpu_utilization, 'mem_util': memory_utilization, 'load_avg': load_avg})
+        with open("./results/results.csv", write_mode) as res_csv:
+            fieldnames = ['time', 'cpu_util', 'mem_util']
+            res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames, lineterminator = '\n')
+            if first_time:
+                res_writer.writeheader()
+            res_writer.writerow({'time': cur_time, 'cpu_util': cpu_utilization, 'mem_util': memory_utilization })
 
 
 

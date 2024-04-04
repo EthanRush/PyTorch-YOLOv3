@@ -87,21 +87,25 @@ def detect_image(model, image, img_size=416, conf_thres=0.5, nms_thres=0.5):
     :rtype: nd.array
     """
     model.eval()  # Set model to evaluation mode
-
+    log_metrics()
     # Configure input
     input_img = transforms.Compose([
         DEFAULT_TRANSFORMS,
         Resize(img_size)])(
             (image, np.zeros((1, 5))))[0].unsqueeze(0)
-
+    log_metrics()
     if torch.cuda.is_available():
         input_img = input_img.to("cuda")
-
+    log_metrics()
     # Get detections
     with torch.no_grad():
+        log_metrics()
         detections = model(input_img)
+        log_metrics()
         detections = non_max_suppression(detections, conf_thres, nms_thres)
+        log_metrics()
         detections = rescale_boxes(detections[0], img_size, image.shape[:2])
+        log_metrics()
     return detections.numpy()
 
 
@@ -127,21 +131,25 @@ def detect(model, dataloader, output_path, conf_thres, nms_thres):
     os.makedirs(output_path, exist_ok=True)
 
     model.eval()  # Set model to evaluation mode
-
+    log_metrics()
     Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.FloatTensor
-
+    log_metrics()
     img_detections = []  # Stores detections for each image index
     imgs = []  # Stores image paths
-
+    log_metrics()
     for (img_paths, input_imgs) in tqdm.tqdm(dataloader, desc="Detecting"):
+        log_metrics()
         # Configure input
         input_imgs = Variable(input_imgs.type(Tensor))
-
+        log_metrics()
         # Get detections
         with torch.no_grad():
+            log_metrics()
             detections = model(input_imgs)
+            log_metrics()
             detections = non_max_suppression(detections, conf_thres, nms_thres)
-
+            log_metrics()
+        log_metrics()
         # Store image and detections
         img_detections.extend(detections)
         imgs.extend(img_paths)
@@ -196,7 +204,9 @@ def _draw_and_save_output_image(image_path, detections, img_size, output_path, c
     n_cls_preds = len(unique_labels)
     # Bounding-box colors
     cmap = plt.get_cmap("tab20b")
+    log_metrics()
     colors = [cmap(i) for i in np.linspace(0, 1, n_cls_preds)]
+    log_metrics()
     bbox_colors = random.sample(colors, n_cls_preds)
     for x1, y1, x2, y2, conf, cls_pred in detections:
         log_metrics()
@@ -206,8 +216,10 @@ def _draw_and_save_output_image(image_path, detections, img_size, output_path, c
         box_h = y2 - y1
 
         color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
+        log_metrics()
         # Create a Rectangle patch
         bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
+        log_metrics()
         # Add the bbox to the plot
         ax.add_patch(bbox)
         # Add label
@@ -248,15 +260,18 @@ def _create_data_loader(img_path, batch_size, img_size, n_cpu):
     :return: Returns DataLoader
     :rtype: DataLoader
     """
+    log_metrics()
     dataset = ImageFolder(
         img_path,
         transform=transforms.Compose([DEFAULT_TRANSFORMS, Resize(img_size)]))
+    log_metrics()
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=n_cpu,
         pin_memory=True)
+    log_metrics()
     return dataloader
 
 
@@ -279,7 +294,7 @@ def run():
     # Extract class names from file
     classes = load_classes(args.classes)  # List of class names
     
-    log_metrics()
+    log_metrics(True)
 
     detect_directory(
         args.model,

@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from pytorchyolo.utils.parse_config import parse_model_config
-from pytorchyolo.utils.utils import weights_init_normal
+from pytorchyolo.utils.utils import weights_init_normal, log_metrics
 
 
 def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
@@ -20,6 +20,7 @@ def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
     :param module_defs: List of dictionaries with module definitions
     :return: Hyperparameters and pytorch module list
     """
+    log_metrics()
     hyperparams = module_defs.pop(0)
     hyperparams.update({
         'batch': int(hyperparams['batch']),
@@ -41,14 +42,17 @@ def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
         "Height and width should be equal! Non square images are padded with zeros."
     output_filters = [hyperparams["channels"]]
     module_list = nn.ModuleList()
+    log_metrics()
     for module_i, module_def in enumerate(module_defs):
+        log_metrics()
         modules = nn.Sequential()
-
+        log_metrics()
         if module_def["type"] == "convolutional":
             bn = int(module_def["batch_normalize"])
             filters = int(module_def["filters"])
             kernel_size = int(module_def["size"])
             pad = (kernel_size - 1) // 2
+            log_metrics()
             modules.add_module(
                 f"conv_{module_i}",
                 nn.Conv2d(
@@ -60,6 +64,7 @@ def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
                     bias=not bn,
                 ),
             )
+            log_metrics()
             if bn:
                 modules.add_module(f"batch_norm_{module_i}",
                                    nn.BatchNorm2d(filters, momentum=0.1, eps=1e-5))
@@ -71,7 +76,7 @@ def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
                 modules.add_module(f"sigmoid_{module_i}", nn.Sigmoid())
             elif module_def["activation"] == "swish":
                 modules.add_module(f"swish_{module_i}", nn.SiLU())
-
+            log_metrics()
         elif module_def["type"] == "maxpool":
             kernel_size = int(module_def["size"])
             stride = int(module_def["stride"])
@@ -95,20 +100,24 @@ def create_modules(module_defs: List[dict]) -> Tuple[dict, nn.ModuleList]:
             modules.add_module(f"shortcut_{module_i}", nn.Sequential())
 
         elif module_def["type"] == "yolo":
+            log_metrics()
             anchor_idxs = [int(x) for x in module_def["mask"].split(",")]
             # Extract anchors
             anchors = [int(x) for x in module_def["anchors"].split(",")]
             anchors = [(anchors[i], anchors[i + 1]) for i in range(0, len(anchors), 2)]
+            log_metrics()
             anchors = [anchors[i] for i in anchor_idxs]
             num_classes = int(module_def["classes"])
+            log_metrics()
             new_coords = bool(module_def.get("new_coords", False))
             # Define detection layer
             yolo_layer = YOLOLayer(anchors, num_classes, new_coords)
+            log_metrics()
             modules.add_module(f"yolo_{module_i}", yolo_layer)
         # Register module list and number of output filters
         module_list.append(modules)
         output_filters.append(filters)
-
+    log_metrics()
     return hyperparams, module_list
 
 
@@ -158,24 +167,31 @@ class YOLOLayer(nn.Module):
         :param x: Input tensor
         :param img_size: Size of the input image
         """
+        log_metrics()
         stride = img_size // x.size(2)
         self.stride = stride
         bs, _, ny, nx = x.shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
         x = x.view(bs, self.num_anchors, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
-
+        log_metrics()
         if not self.training:  # inference
             if self.grid.shape[2:4] != x.shape[2:4]:
+                log_metrics()
                 self.grid = self._make_grid(nx, ny).to(x.device)
-
+                log_metrics()
             if self.new_coords:
+                log_metrics()
                 x[..., 0:2] = (x[..., 0:2] + self.grid) * stride  # xy
                 x[..., 2:4] = x[..., 2:4] ** 2 * (4 * self.anchor_grid) # wh
+                log_metrics()
             else:
+                log_metrics()
                 x[..., 0:2] = (x[..., 0:2].sigmoid() + self.grid) * stride  # xy
                 x[..., 2:4] = torch.exp(x[..., 2:4]) * self.anchor_grid # wh
+                log_metrics()
                 x[..., 4:] = x[..., 4:].sigmoid() # conf, cls
+                log_metrics()
             x = x.view(bs, -1, self.no)
-
+        log_metrics()
         return x
 
     @staticmethod
@@ -224,7 +240,7 @@ class Darknet(nn.Module):
 
     def load_darknet_weights(self, weights_path):
         """Parses and loads the weights stored in 'weights_path'"""
-
+        log_metrics()
         # Open the weights file
         with open(weights_path, "rb") as f:
             # First five are header values
@@ -232,7 +248,7 @@ class Darknet(nn.Module):
             self.header_info = header  # Needed to write header when saving weights
             self.seen = header[3]  # number of images seen during training
             weights = np.fromfile(f, dtype=np.float32)  # The rest are weights
-
+        log_metrics()
         # Establish cutoff for loading backbone weights
         cutoff = None
         # If the weights file has a cutoff, we can find out about it by looking at the filename
@@ -243,9 +259,10 @@ class Darknet(nn.Module):
                 cutoff = int(filename.split(".")[-1])  # use last part of filename
             except ValueError:
                 pass
-
+        log_metrics()
         ptr = 0
         for i, (module_def, module) in enumerate(zip(self.module_defs, self.module_list)):
+            log_metrics()
             if i == cutoff:
                 break
             if module_def["type"] == "convolutional":
@@ -258,21 +275,25 @@ class Darknet(nn.Module):
                     bn_b = torch.from_numpy(
                         weights[ptr: ptr + num_b]).view_as(bn_layer.bias)
                     bn_layer.bias.data.copy_(bn_b)
+                    log_metrics()
                     ptr += num_b
                     # Weight
                     bn_w = torch.from_numpy(
                         weights[ptr: ptr + num_b]).view_as(bn_layer.weight)
                     bn_layer.weight.data.copy_(bn_w)
+                    log_metrics()
                     ptr += num_b
                     # Running Mean
                     bn_rm = torch.from_numpy(
                         weights[ptr: ptr + num_b]).view_as(bn_layer.running_mean)
                     bn_layer.running_mean.data.copy_(bn_rm)
+                    log_metrics()
                     ptr += num_b
                     # Running Var
                     bn_rv = torch.from_numpy(
                         weights[ptr: ptr + num_b]).view_as(bn_layer.running_var)
                     bn_layer.running_var.data.copy_(bn_rv)
+                    log_metrics()
                     ptr += num_b
                 else:
                     # Load conv. bias
@@ -281,6 +302,7 @@ class Darknet(nn.Module):
                         weights[ptr: ptr + num_b]).view_as(conv_layer.bias)
                     conv_layer.bias.data.copy_(conv_b)
                     ptr += num_b
+                log_metrics()
                 # Load conv. weights
                 num_w = conv_layer.weight.numel()
                 conv_w = torch.from_numpy(
@@ -327,14 +349,17 @@ def load_model(model_path, weights_path=None):
     :return: Returns model
     :rtype: Darknet
     """
+    log_metrics()
     device = torch.device("cuda" if torch.cuda.is_available()
                           else "cpu")  # Select device for inference
+    log_metrics()
     model = Darknet(model_path).to(device)
-
+    log_metrics()
     model.apply(weights_init_normal)
-
+    log_metrics()
     # If pretrained weights are specified, start from checkpoint or weight file
     if weights_path:
+        log_metrics()
         if weights_path.endswith(".pth"):
             # Load checkpoint weights
             model.load_state_dict(torch.load(weights_path, map_location=device))
