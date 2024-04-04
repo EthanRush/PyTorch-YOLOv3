@@ -370,7 +370,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
     for xi, x in enumerate(prediction):  # image index, image inference
 
-
+        log_metrics()
 
 
         # Apply constraints
@@ -394,7 +394,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         else:  # best class only
             conf, j = x[:, 5:].max(1, keepdim=True)
             x = torch.cat((box, conf, j.float()), 1)[conf.view(-1) > conf_thres]
-
+        log_metrics()
         # Filter by class
         if classes is not None:
             x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
@@ -406,7 +406,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         elif n > max_nms:  # excess boxes
             # sort by confidence
             x = x[x[:, 4].argsort(descending=True)[:max_nms]]
-
+        log_metrics()
         # Batched NMS
         c = x[:, 5:6] * max_wh  # classes
         # boxes (offset by class), scores
@@ -414,13 +414,14 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
         i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
         if i.shape[0] > max_det:  # limit detections
             i = i[:max_det]
-
+        log_metrics()
         output[xi] = to_cpu(x[i])
 
         if (time.time() - t) > time_limit:
             print(f'WARNING: NMS time limit {time_limit}s exceeded')
             break  # time limit exceeded
-
+        log_metrics()
+    log_metrics()
     return output
 
 
