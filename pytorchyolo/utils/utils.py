@@ -10,6 +10,8 @@ import numpy as np
 import subprocess
 import random
 import imgaug as ia
+import psutil
+import pynvml
 
 
 def provide_determinism(seed=42):
@@ -305,16 +307,12 @@ def box_iou(box1, box2):
 
 import csv
 def log_metrics():
-    import psutil
 
     # CPU utilization
-    cpu_utilization = psutil.cpu_percent(interval=.2)
+    cpu_utilization = psutil.cpu_percent()
 
     # Memory utilization
     memory_utilization = psutil.virtual_memory().percent
-
-    import torch
-
 
     if torch.cuda.is_available():
         # GPU utilization
@@ -323,7 +321,6 @@ def log_metrics():
         # GPU memory utilization
         gpu_memory_utilization = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() * 100
 
-        import pynvml
 
         handle = nvmlDeviceGetHandleByIndex(0)
 
