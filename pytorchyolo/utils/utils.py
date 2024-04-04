@@ -309,7 +309,7 @@ import csv
 def log_metrics():
 
     # CPU utilization
-    cpu_utilization = psutil.cpu_percent()
+    cpu_utilization = psutil.cpu_percent(interval=None)
 
     # Memory utilization
     memory_utilization = psutil.virtual_memory().percent
