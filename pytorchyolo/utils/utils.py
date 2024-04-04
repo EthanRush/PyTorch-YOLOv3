@@ -303,6 +303,50 @@ def box_iou(box1, box2):
     return inter / (area1[:, None] + area2 - inter)
 
 
+import csv
+def log_metrics():
+    import psutil
+
+    # CPU utilization
+    cpu_utilization = psutil.cpu_percent(interval=1)
+
+    # Memory utilization
+    memory_utilization = psutil.virtual_memory().percent
+
+    import torch
+
+
+    if torch.cuda.is_available():
+        # GPU utilization
+        gpu_utilization = torch.cuda.device(0).utilization
+
+        # GPU memory utilization
+        gpu_memory_utilization = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() * 100
+
+        import pynvml
+
+        handle = nvmlDeviceGetHandleByIndex(0)
+
+        draw = pynvml.nvmlDeviceGetPowerUsage(handle)
+
+
+        with open("./results/results.csv", "a") as res_csv:
+            fieldnames = ['cpu_util', 'mem_util', 'gpu_util', 'gpu_mem', 'gpu_draw']
+            res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames)
+            res_writer.writeheader()
+            res_writer.writerow({'cpu_util': cpu_utilization, 'mem_util': memory_utilization, 'gpu_util': gpu_utilization, 'gpu_mem':gpu_memory_utilization, 'gpu_draw': draw})
+    else:
+        with open("./results/results.csv", "a") as res_csv:
+            fieldnames = ['cpu_util', 'mem_util']
+            res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames)
+            res_writer.writeheader()
+            res_writer.writerow({'cpu_util': cpu_utilization, 'mem_util': memory_utilization})
+
+
+
+
+
+
 def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=None):
     """Performs Non-Maximum Suppression (NMS) on inference results
     Returns:
@@ -322,7 +366,13 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
     t = time.time()
     output = [torch.zeros((0, 6), device="cpu")] * prediction.shape[0]
 
+    log_metrics()
+
     for xi, x in enumerate(prediction):  # image index, image inference
+
+
+
+
         # Apply constraints
         # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
         x = x[x[..., 4] > conf_thres]  # confidence

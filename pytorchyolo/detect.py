@@ -266,6 +266,9 @@ def run():
 
     # Extract class names from file
     classes = load_classes(args.classes)  # List of class names
+    
+    import pynvml
+    nvmlInit()
 
     detect_directory(
         args.model,
