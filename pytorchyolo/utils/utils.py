@@ -310,6 +310,7 @@ def log_metrics():
 
     # CPU utilization
     cpu_utilization = psutil.cpu_percent(interval=None)
+    load_avg = psutil.getloadavg()
 
     # Memory utilization
     memory_utilization = psutil.virtual_memory().percent
@@ -334,10 +335,10 @@ def log_metrics():
             res_writer.writerow({'cpu_util': cpu_utilization, 'mem_util': memory_utilization, 'gpu_util': gpu_utilization, 'gpu_mem':gpu_memory_utilization, 'gpu_draw': draw})
     else:
         with open("./results/results.csv", "a") as res_csv:
-            fieldnames = ['cpu_util', 'mem_util']
+            fieldnames = ['cpu_util', 'mem_util', 'load_avg']
             res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames)
             res_writer.writeheader()
-            res_writer.writerow({'cpu_util': cpu_utilization, 'mem_util': memory_utilization})
+            res_writer.writerow({'cpu_util': cpu_utilization, 'mem_util': memory_utilization, 'load_avg': load_avg})
 
 
 
