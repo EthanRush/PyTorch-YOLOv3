@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
 from pytorchyolo.models import load_model
-from pytorchyolo.utils.utils import load_classes, rescale_boxes, non_max_suppression, print_environment_info
+from pytorchyolo.utils.utils import load_classes, rescale_boxes, non_max_suppression, print_environment_info, log_metrics
 from pytorchyolo.utils.datasets import ImageFolder
 from pytorchyolo.utils.transforms import Resize, DEFAULT_TRANSFORMS
 
@@ -51,15 +51,21 @@ def detect_directory(model_path, weights_path, img_path, classes, output_path,
     :type nms_thres: float, optional
     """
     dataloader = _create_data_loader(img_path, batch_size, img_size, n_cpu)
+    log_metrics()
     model = load_model(model_path, weights_path)
+    log_metrics()
+
     img_detections, imgs = detect(
         model,
         dataloader,
         output_path,
         conf_thres,
         nms_thres)
+    log_metrics()
+
     _draw_and_save_output_images(
         img_detections, imgs, img_size, output_path, classes)
+    log_metrics()
 
     print(f"---- Detections were saved to: '{output_path}' ----")
 
@@ -267,8 +273,7 @@ def run():
     # Extract class names from file
     classes = load_classes(args.classes)  # List of class names
     
-    import pynvml
-    nvmlInit()
+    log_metrics()
 
     detect_directory(
         args.model,
