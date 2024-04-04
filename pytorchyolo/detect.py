@@ -165,6 +165,7 @@ def _draw_and_save_output_images(img_detections, imgs, img_size, output_path, cl
 
     # Iterate through images and save plot of detections
     for (image_path, detections) in zip(imgs, img_detections):
+        log_metrics()
         print(f"Image {image_path}:")
         _draw_and_save_output_image(
             image_path, detections, img_size, output_path, classes)
@@ -198,7 +199,7 @@ def _draw_and_save_output_image(image_path, detections, img_size, output_path, c
     colors = [cmap(i) for i in np.linspace(0, 1, n_cls_preds)]
     bbox_colors = random.sample(colors, n_cls_preds)
     for x1, y1, x2, y2, conf, cls_pred in detections:
-
+        log_metrics()
         print(f"\t+ Label: {classes[int(cls_pred)]} | Confidence: {conf.item():0.4f}")
 
         box_w = x2 - x1
@@ -217,6 +218,7 @@ def _draw_and_save_output_image(image_path, detections, img_size, output_path, c
             color="white",
             verticalalignment="top",
             bbox={"color": color, "pad": 0})
+        log_metrics()
 
     # Save generated image with detections
     plt.axis("off")
@@ -224,8 +226,12 @@ def _draw_and_save_output_image(image_path, detections, img_size, output_path, c
     plt.gca().yaxis.set_major_locator(NullLocator())
     filename = os.path.basename(image_path).split(".")[0]
     output_path = os.path.join(output_path, f"{filename}.png")
+    log_metrics()
+
     plt.savefig(output_path, bbox_inches="tight", pad_inches=0.0)
     plt.close()
+    log_metrics()
+
 
 
 def _create_data_loader(img_path, batch_size, img_size, n_cpu):
