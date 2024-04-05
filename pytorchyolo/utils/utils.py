@@ -58,6 +58,7 @@ def load_classes(path):
 
 def weights_init_normal(m):
     classname = m.__class__.__name__
+    log_metrics()
     if classname.find("Conv") != -1:
         nn.init.normal_(m.weight.data, 0.0, 0.02)
     elif classname.find("BatchNorm2d") != -1:
@@ -87,7 +88,7 @@ def rescale_boxes(boxes, current_dim, original_shape):
     boxes[:, 2] = ((boxes[:, 2] - pad_x // 2) / unpad_w) * orig_w
     log_metrics()
     boxes[:, 3] = ((boxes[:, 3] - pad_y // 2) / unpad_h) * orig_h
-    log_metrics()
+    log_metrics()                   
     return boxes
 
 
@@ -131,6 +132,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
     # Create Precision-Recall curve and compute AP for each class
     ap, p, r = [], [], []
     for c in tqdm.tqdm(unique_classes, desc="Computing AP"):
+        log_metrics()
         i = pred_cls == c
         n_gt = (target_cls == c).sum()  # Number of ground truth objects
         n_p = i.sum()  # Number of predicted objects
@@ -156,7 +158,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
 
             # AP from recall-precision curve
             ap.append(compute_ap(recall_curve, precision_curve))
-
+        log_metrics()
     # Compute F1 score (harmonic mean of precision and recall)
     p, r, ap = np.array(p), np.array(r), np.array(ap)
     f1 = 2 * p * r / (p + r + 1e-16)
@@ -330,7 +332,6 @@ def log_metrics(first_time:bool=False):
 
     # CPU utilization
     cpu_utilization = psutil.cpu_percent(interval=None)
-    load_avg = psutil.getloadavg()
 
     # Memory utilization
     memory_utilization = psutil.virtual_memory().percent
