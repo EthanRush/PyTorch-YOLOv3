@@ -342,6 +342,8 @@ def log_metrics(first_time:bool=False):
         # GPU utilization
         gpu_utilization = torch.cuda.utilization()
 
+        print(f"Memory Allocated: {torch.cuda.memory_allocated() / 1e6} MB")
+        print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated() / 1e6} MB")
         # GPU memory utilization
         gpu_memory_utilization = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() * 100
 
