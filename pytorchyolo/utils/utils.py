@@ -351,7 +351,7 @@ def log_metrics(first_time:bool=False):
         draw = pynvml.nvmlDeviceGetPowerUsage(handle)
 
 
-        with open("./results/results.csv", write_mode) as res_csv:
+        with open("./results/gpu/results.csv", write_mode) as res_csv:
             fieldnames = ['time', 'cpu_util', 'mem_util', 'gpu_util', 'gpu_mem', 'gpu_draw']
             res_writer = csv.DictWriter(res_csv, fieldnames=fieldnames, lineterminator = '\n')
             if first_time:
