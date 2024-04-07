@@ -340,7 +340,7 @@ def log_metrics(first_time:bool=False):
     cur_time = round(cur_time, 6)
     if torch.cuda.is_available():
         # GPU utilization
-        gpu_utilization = torch.cuda.device(0).utilization
+        gpu_utilization = torch.cuda.utilization()
 
         # GPU memory utilization
         gpu_memory_utilization = torch.cuda.memory_allocated() / torch.cuda.max_memory_allocated() * 100
