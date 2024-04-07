@@ -349,7 +349,7 @@ def log_metrics(first_time:bool=False):
             gpu_memory_utilization = 0
 
 
-        handle = nvmlDeviceGetHandleByIndex(0)
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
 
         draw = pynvml.nvmlDeviceGetPowerUsage(handle)
 
